@@ -22,6 +22,8 @@ PrecompiledWeb
 Thumbs.db 
 
 #added for now
+./bin
+/bin
 /Properties/
 /appsettings.json
 ./appsettings.json
