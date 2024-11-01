@@ -133,6 +133,48 @@ namespace spotifyRunnerApp.Controllers
             }
         }
 
+        [HttpGet("tracks")]
+        public async Task<IActionResult> getUserTopSongs()
+        {
+            string accessToken = _accessToken;
+            using var httpClient = new HttpClient();
+            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+            var response = await httpClient.GetAsync("https://api.spotify.com/v1/me/top/tracks");
+            if (response.IsSuccessStatusCode)
+            {
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+                return Ok(jsonResponse);
+            }
+            else
+            {
+                return BadRequest("Failed to retrieve user tracks");
+            }
+        }
+
+        //In postman after loggin in through the spotifyRunner web app https://localhost:44336/spotifyrunner/add-to-queue?trackUri=spotify:track:4iV5W9uYEdYUVa79Axb7Rh
+        [HttpPost("add-to-queue")]
+        public async Task<IActionResult> AddToQueue([FromQuery] string trackUri)
+        {
+            string accessToken = _accessToken;
+            using var httpClient = new HttpClient();
+            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+            var url = $"https://api.spotify.com/v1/me/player/queue?uri={Uri.EscapeDataString(trackUri)}";
+            var response = await httpClient.PostAsync(url, null);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                return Ok(new { message = "Check your phone bozo" });
+            }
+            else
+            {
+                var errorResponse = await response.Content.ReadAsStringAsync();
+                return BadRequest(new { message = "Failed to add track to queue", details = errorResponse });
+            }
+        }
+
+
         private static string QueryStringFromDictionary(Dictionary<string, string> queryParams)
         {
             return string.Join("&", queryParams.Select(kvp => $"{kvp.Key}={HttpUtility.UrlEncode(kvp.Value)}"));
