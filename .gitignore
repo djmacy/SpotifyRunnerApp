@@ -23,7 +23,9 @@ Thumbs.db
 
 #added for now
 ./bin
-/bin
+./obj
+./SpotifyRunnerApp.csproj
+./appsettings.Development.json
 /Properties/
 /appsettings.json
 ./appsettings.json
