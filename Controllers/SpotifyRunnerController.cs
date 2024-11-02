@@ -47,8 +47,10 @@ namespace spotifyRunnerApp.Controllers
             string clientId = GetConfigValue("Spotify:ClientId");
             string redirectUri = GetConfigValue("Spotify:RedirectUri");
             string scope = GetConfigValue("Spotify:Scope");
+            //Generate a random string to help protect against csrf attacks. Will need to verify that we get this back when we redirect to callback
             string state = GenerateRandomString(16);
-
+            //store the state in a session so we can check later
+            HttpContext.Session.SetString("OAuthState", state);
             string spotifyAuthUrl = _spotifyAPIService.BuildSpotifyAuthUrl(clientId, redirectUri, scope, state);
 
             return Redirect(spotifyAuthUrl);
@@ -58,9 +60,9 @@ namespace spotifyRunnerApp.Controllers
         [HttpGet("callback")]
         public async Task<IActionResult> Callback(string code, string state)
         {
-
+            var storedState = HttpContext.Session.GetString("OAuthState");
             // Check state to mitigate CSRF attacks
-            if (state == null)
+            if (string.IsNullOrEmpty(state) || state != storedState)
             {
                 return BadRequest("State mismatch error");
             }
