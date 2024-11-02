@@ -1,5 +1,8 @@
-﻿namespace SpotifyRunnerApp.Models
+﻿using System.ComponentModel.DataAnnotations.Schema;
+
+namespace SpotifyRunnerApp.Models
 {
+    [Table("spotify_user")]
     public class SpotifyUser
     {
         public int Id { get; set; }

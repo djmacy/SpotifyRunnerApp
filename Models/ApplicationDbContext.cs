@@ -10,7 +10,7 @@ namespace SpotifyRunnerApp.Models
         {
         }
 
-        public DbSet<SpotifyUser> SpotifyUsers { get; set; }
+        public DbSet<SpotifyUser> spotify_user { get; set; }
     }
     
 }

@@ -5,6 +5,8 @@ using System.Net.Http.Headers;
 using System.Text;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Configuration.UserSecrets;
+using SpotifyRunnerApp.Models;
 
 namespace spotifyRunnerApp.Controllers
 {
@@ -13,12 +15,14 @@ namespace spotifyRunnerApp.Controllers
     public class SpotifyRunnerController : ControllerBase
     {
         private readonly IConfiguration _config;
+        private readonly ApplicationDbContext _dbContext;
 
-        private static string _accessToken;
+        //private static string _accessToken;
 
-        public SpotifyRunnerController(IConfiguration config)
+        public SpotifyRunnerController(IConfiguration config, ApplicationDbContext dbContext)
         {
             _config = config;
+            _dbContext = dbContext;
         }
 
         [HttpGet("testjson")]
@@ -63,8 +67,6 @@ namespace spotifyRunnerApp.Controllers
         [HttpGet("callback")]
         public async Task<IActionResult> Callback(string code, string state)
         {
-            //Console.WriteLine($"Received code: {code}");
-           // Console.WriteLine($"Received state: {state}");
 
             // Check state to mitigate CSRF attacks
             if (state == null)
@@ -96,15 +98,40 @@ namespace spotifyRunnerApp.Controllers
             if (tokenResponse.IsSuccessStatusCode)
             {
                 var jsonResponse = await tokenResponse.Content.ReadAsStringAsync();
-                Console.WriteLine($"Response from token endpoint: {jsonResponse}");
-                System.Diagnostics.Debug.WriteLine($"Response from token endpoint: {jsonResponse}");
-                var tokenData = JsonSerializer.Deserialize<TokenResponse>(jsonResponse);
-                System.Diagnostics.Debug.WriteLine($"Response from token endpoint: {tokenData.AccessToken}");
 
-                // Store the access token in the global variable
-                _accessToken = tokenData.AccessToken;
-                Console.WriteLine(tokenData.AccessToken);
-                return Ok(new { message = "Access token received", accessToken = _accessToken });
+                var tokenData = JsonSerializer.Deserialize<TokenResponse>(jsonResponse);
+                var accessToken = tokenData.AccessToken;
+                
+                string userId = "";
+                //Get the user id
+                var userProfileResult = await GetUserProfile(tokenData.AccessToken);
+                if (userProfileResult is OkObjectResult okResult)
+                {
+                    if (okResult.Value != null)
+                    {
+                        userId = okResult.Value as string;
+                        var newUser = new SpotifyUser
+                        {
+                            Username = userId,
+                            AccessToken = tokenData.AccessToken,
+                            ExpiresIn = tokenData.ExpiresIn.ToString(),
+                            RefreshToken = tokenData.RefreshToken
+                        };
+
+                        //Add user to db
+                        await _dbContext.spotify_user.AddAsync(newUser);
+                        await _dbContext.SaveChangesAsync();
+
+                    } else
+                    {
+                        return BadRequest("User id is null");
+                    }
+                    
+                } else
+                {
+                    return BadRequest("Failed to grab user Id");
+                }
+                return Ok(new { message = "Access token received", accessToken = accessToken, userId = userId });
             }
             else
             {
@@ -113,10 +140,14 @@ namespace spotifyRunnerApp.Controllers
         }
 
         [HttpGet("me")]
-        public async Task<IActionResult> GetUserProfile()
+        public async Task<IActionResult> GetUserProfile(string accessToken)
         {
+            if (accessToken == null)
+            {
+                return BadRequest("No access token provided"); ;
+            }
             // Assuming you have stored the access token after exchanging the code
-            string accessToken = _accessToken; // Replace this with the actual access token
+            //string accessToken = _accessToken; // Replace this with the actual access token
 
             using var httpClient = new HttpClient();
             httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
@@ -125,54 +156,65 @@ namespace spotifyRunnerApp.Controllers
             if (response.IsSuccessStatusCode)
             {
                 var jsonResponse = await response.Content.ReadAsStringAsync();
-                return Ok(jsonResponse); // Return the user's profile information
+                var userData = JsonSerializer.Deserialize<UserProfile>(jsonResponse);
+                if (userData != null)
+                {
+                    return Ok(userData.Id);
+                } else
+                {
+                    return BadRequest("Failed to deserailzie user profile");
+                }
+              //  System.Diagnostics.Debug.WriteLine(userData);
+                //return Ok(jsonResponse); // Return the user's profile information
             }
             else
             {
                 return BadRequest("Failed to retrieve user profile");
             }
         }
+        /**
+         * Come back to this by getting db value?  
+         **/
+        //[HttpGet("tracks")]
+        //public async Task<IActionResult> getUserTopSongs()
+        //{
+        //    string accessToken = _accessToken;
+        //    using var httpClient = new HttpClient();
+        //    httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-        [HttpGet("tracks")]
-        public async Task<IActionResult> getUserTopSongs()
-        {
-            string accessToken = _accessToken;
-            using var httpClient = new HttpClient();
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-
-            var response = await httpClient.GetAsync("https://api.spotify.com/v1/me/top/tracks");
-            if (response.IsSuccessStatusCode)
-            {
-                var jsonResponse = await response.Content.ReadAsStringAsync();
-                return Ok(jsonResponse);
-            }
-            else
-            {
-                return BadRequest("Failed to retrieve user tracks");
-            }
-        }
+        //    var response = await httpClient.GetAsync("https://api.spotify.com/v1/me/top/tracks");
+        //    if (response.IsSuccessStatusCode)
+        //    {
+        //        var jsonResponse = await response.Content.ReadAsStringAsync();
+        //        return Ok(jsonResponse);
+        //    }
+        //    else
+        //    {
+        //        return BadRequest("Failed to retrieve user tracks");
+        //    }
+        //}
 
         //In postman after loggin in through the spotifyRunner web app https://localhost:44336/spotifyrunner/add-to-queue?trackUri=spotify:track:4iV5W9uYEdYUVa79Axb7Rh
-        [HttpPost("add-to-queue")]
-        public async Task<IActionResult> AddToQueue([FromQuery] string trackUri)
-        {
-            string accessToken = _accessToken;
-            using var httpClient = new HttpClient();
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        //[HttpPost("add-to-queue")]
+        //public async Task<IActionResult> AddToQueue([FromQuery] string trackUri)
+        //{
+        //    string accessToken = _accessToken;
+        //    using var httpClient = new HttpClient();
+        //    httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-            var url = $"https://api.spotify.com/v1/me/player/queue?uri={Uri.EscapeDataString(trackUri)}";
-            var response = await httpClient.PostAsync(url, null);
+        //    var url = $"https://api.spotify.com/v1/me/player/queue?uri={Uri.EscapeDataString(trackUri)}";
+        //    var response = await httpClient.PostAsync(url, null);
             
-            if (response.IsSuccessStatusCode)
-            {
-                return Ok(new { message = "Check your phone bozo" });
-            }
-            else
-            {
-                var errorResponse = await response.Content.ReadAsStringAsync();
-                return BadRequest(new { message = "Failed to add track to queue", details = errorResponse });
-            }
-        }
+        //    if (response.IsSuccessStatusCode)
+        //    {
+        //        return Ok(new { message = "Check your phone bozo" });
+        //    }
+        //    else
+        //    {
+        //        var errorResponse = await response.Content.ReadAsStringAsync();
+        //        return BadRequest(new { message = "Failed to add track to queue", details = errorResponse });
+        //    }
+        //}
 
 
         private static string QueryStringFromDictionary(Dictionary<string, string> queryParams)
@@ -202,7 +244,18 @@ namespace spotifyRunnerApp.Controllers
             public int ExpiresIn { get; set; }
 
             [JsonPropertyName("refresh_token")]
-            public string RefreshToken { get; set; } // Optional
+            public string RefreshToken { get; set; } 
+        }
+
+        public class UserProfile
+        {
+            [JsonPropertyName("id")]
+            public string Id { get; set; }
+            [JsonPropertyName("display_name")]
+            public string DisplayName { get; set; }
+            [JsonPropertyName("email")]
+            public string Email { get; set; }
+
         }
     }
 }
