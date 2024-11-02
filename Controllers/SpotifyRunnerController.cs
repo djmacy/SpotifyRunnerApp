@@ -13,13 +13,13 @@ namespace spotifyRunnerApp.Controllers
     [Route("[controller]")]
     public class SpotifyRunnerController : ControllerBase
     {
-        //Grab the configs so that we can use them for spotify api calls. 
+        // Grab the configs so that we can use them for spotify api calls. 
         private readonly IConfiguration _config;
-        //Get the psql database services 
+        // Get the psql database services 
         private readonly SpotifyUserService _userService;
         private readonly SpotifyAPIService _spotifyAPIService;
 
-        //constructor for controller to make sure we have the service and configs
+        // constructor for controller to make sure we have the service and configs. Dependency Injection
         public SpotifyRunnerController(IConfiguration config, SpotifyUserService userService, SpotifyAPIService spotifyAPIService)
         {
             _config = config;
@@ -40,38 +40,45 @@ namespace spotifyRunnerApp.Controllers
         }
 
         // spotifyRunner/login endpoint which will redirect us to the spotify auth url. This will allows us to get access or permission to see users spotify information by giving us the authentication code which will
-        //be exchanged in the /callback endpoint for the auth token. With the token we can call the spotify api passing it as a header in our calls.
+        // be exchanged in the /callback endpoint for the auth token. With the token we can call the spotify api passing it as a header in our calls.
         [HttpGet("login")]
         public IActionResult Login()
         {
             string clientId = GetConfigValue("Spotify:ClientId");
+            //Is used to redirect the user back to our site. Spotify has to know what this is as well and is set up in dev dashboard for spotify.
             string redirectUri = GetConfigValue("Spotify:RedirectUri");
+            //Different scopes give us different permissions. See spotify doc for more info.
             string scope = GetConfigValue("Spotify:Scope");
-            //Generate a random string to help protect against csrf attacks. Will need to verify that we get this back when we redirect to callback
+            // Generate a random string to help protect against csrf attacks. Will need to verify that we get this back when we redirect to callback.
             string state = GenerateRandomString(16);
-            //store the state in a session so we can check later
+            // store the state in a session so we can check later.
             HttpContext.Session.SetString("OAuthState", state);
+            // URL used to send the user to the Spotify Login screen and show perm we need in order to run our endpoints.
             string spotifyAuthUrl = _spotifyAPIService.BuildSpotifyAuthUrl(clientId, redirectUri, scope, state);
-
+            // This redirection will take us to the spotify login. If user accepts, spotify will then redirect them back to our site using redirect URI
+            // defined above. If they deny then it will also redirect but with deny response. 
             return Redirect(spotifyAuthUrl);
         }
 
-
+        // As part of the redirection above spotify redirects the user back to the url you specified as redirect_uri during the authorization request
+        // In ASP.NET parameters in query string are automatically bound to method parameters so the code and state are coming straight from Spotify
+        // response. This endpoint will grab the auth token for us to be able to make api calls to spotify regarding our users music.
         [HttpGet("callback")]
         public async Task<IActionResult> Callback(string code, string state)
         {
+            // Check the session variable to make sure the states match.
             var storedState = HttpContext.Session.GetString("OAuthState");
-            // Check state to mitigate CSRF attacks
             if (string.IsNullOrEmpty(state) || state != storedState)
             {
                 return BadRequest("State mismatch error");
             }
 
-            // Retrieve configuration values
+            // Retrieve configuration values.
             var clientId = GetConfigValue("Spotify:ClientId");
             var clientSecret = GetConfigValue("Spotify:ClientSecret");
             var redirectUri = GetConfigValue("Spotify:RedirectUri");
 
+            // Retrieves the authentication
             var tokenResponse = await _spotifyAPIService.ExchangeCodeForToken(code, clientId, clientSecret, redirectUri);
             if (!tokenResponse.IsSuccessStatusCode)
             {
