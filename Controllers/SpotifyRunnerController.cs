@@ -17,12 +17,14 @@ namespace spotifyRunnerApp.Controllers
         private readonly IConfiguration _config;
         //Get the psql database services 
         private readonly SpotifyUserService _userService;
+        private readonly SpotifyAPIService _spotifyAPIService;
 
         //constructor for controller to make sure we have the service and configs
-        public SpotifyRunnerController(IConfiguration config, SpotifyUserService userService)
+        public SpotifyRunnerController(IConfiguration config, SpotifyUserService userService, SpotifyAPIService spotifyAPIService)
         {
             _config = config;
             _userService = userService;
+            _spotifyAPIService = spotifyAPIService;
         }
 
         [HttpGet("testjson")]
@@ -47,7 +49,7 @@ namespace spotifyRunnerApp.Controllers
             string scope = GetConfigValue("Spotify:Scope");
             string state = GenerateRandomString(16);
 
-            string spotifyAuthUrl = BuildSpotifyAuthUrl(clientId, redirectUri, scope, state);
+            string spotifyAuthUrl = _spotifyAPIService.BuildSpotifyAuthUrl(clientId, redirectUri, scope, state);
 
             return Redirect(spotifyAuthUrl);
         }
@@ -68,7 +70,7 @@ namespace spotifyRunnerApp.Controllers
             var clientSecret = GetConfigValue("Spotify:ClientSecret");
             var redirectUri = GetConfigValue("Spotify:RedirectUri");
 
-            var tokenResponse = await ExchangeCodeForToken(code, clientId, clientSecret, redirectUri);
+            var tokenResponse = await _spotifyAPIService.ExchangeCodeForToken(code, clientId, clientSecret, redirectUri);
             if (!tokenResponse.IsSuccessStatusCode)
             {
                 return BadRequest("Failed to exchange code for token");
@@ -77,7 +79,7 @@ namespace spotifyRunnerApp.Controllers
             var jsonResponse = await tokenResponse.Content.ReadAsStringAsync();
             var tokenData = JsonSerializer.Deserialize<TokenResponse>(jsonResponse);
 
-            var userId = await GetUserIdFromToken(tokenData.AccessToken);
+            var userId = await _spotifyAPIService.GetUserIdFromToken(tokenData.AccessToken);
 
             if (string.IsNullOrEmpty(userId))
             {
@@ -137,88 +139,6 @@ namespace spotifyRunnerApp.Controllers
 
         private string GetConfigValue(string key) => _config[key];
 
-        private async Task<UserProfile> GetUserProfile(string accessToken)
-        {
-            if (string.IsNullOrEmpty(accessToken))
-            {
-                throw new ArgumentException("No access token provided", nameof(accessToken));
-            }
-
-            using var httpClient = new HttpClient();
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-
-            var response = await httpClient.GetAsync("https://api.spotify.com/v1/me");
-
-            if (response.IsSuccessStatusCode)
-            {
-                var jsonResponse = await response.Content.ReadAsStringAsync();
-                var userData = JsonSerializer.Deserialize<UserProfile>(jsonResponse);
-
-                if (userData != null)
-                {
-                    return userData;
-                }
-                else
-                {
-                    throw new InvalidOperationException("Failed to deserialize user profile");
-                }
-            }
-            else
-            {
-                throw new InvalidOperationException("Failed to retrieve user profile");
-            }
-        }
-
-        private async Task<HttpResponseMessage> ExchangeCodeForToken(string code, string clientId, string clientSecret, string redirectUri)
-        {
-            using var httpClient = new HttpClient();
-            var requestBody = new FormUrlEncodedContent(new[]
-            {
-                new KeyValuePair<string, string>("code", code),
-                new KeyValuePair<string, string>("redirect_uri", redirectUri),
-                new KeyValuePair<string, string>("grant_type", "authorization_code")
-             });
-
-            var clientCredentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{clientId}:{clientSecret}"));
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", clientCredentials);
-
-            return await httpClient.PostAsync("https://accounts.spotify.com/api/token", requestBody);
-        }
-
-        private async Task<string> GetUserIdFromToken(string accessToken)
-        {
-            try
-            {
-                var userProfile = await GetUserProfile(accessToken);
-                return userProfile?.Id; // Assuming UserProfile has an Id property
-            }
-            catch (Exception ex)
-            {
-                // Log the exception or handle it as needed
-                return null; // Or throw again, or handle error accordingly
-            }
-        }
-
-        private string BuildSpotifyAuthUrl(string clientId, string redirectUri, string scope, string state)
-        {
-            var queryParams = new Dictionary<string, string>
-    {
-        { "response_type", "code" },
-        { "client_id", clientId },
-        { "scope", scope },
-        { "redirect_uri", redirectUri },
-        { "state", state }
-    };
-
-            string queryString = QueryStringFromDictionary(queryParams);
-            return $"https://accounts.spotify.com/authorize?{queryString}";
-        }
-
-        private static string QueryStringFromDictionary(Dictionary<string, string> queryParams)
-        {
-            return string.Join("&", queryParams.Select(kvp => $"{kvp.Key}={HttpUtility.UrlEncode(kvp.Value)}"));
-        }
-
         private static string GenerateRandomString(int length) // Fixed the method name here
         {
             const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -227,32 +147,5 @@ namespace spotifyRunnerApp.Controllers
                                          .Select(s => s[random.Next(s.Length)]) // Fixed case for Length
                                          .ToArray()); // Changed to ToArray() for correct conversion
         }
-
-        // Model for deserializing token response
-        //public class TokenResponse
-        //{
-        //    [JsonPropertyName("access_token")]
-        //    public string AccessToken { get; set; }
-
-        //    [JsonPropertyName("token_type")]
-        //    public string TokenType { get; set; }
-
-        //    [JsonPropertyName("expires_in")]
-        //    public int ExpiresIn { get; set; }
-
-        //    [JsonPropertyName("refresh_token")]
-        //    public string RefreshToken { get; set; } 
-        //}
-
-        //public class UserProfile
-        //{
-        //    [JsonPropertyName("id")]
-        //    public string Id { get; set; }
-        //    [JsonPropertyName("display_name")]
-        //    public string DisplayName { get; set; }
-        //    [JsonPropertyName("email")]
-        //    public string Email { get; set; }
-
-        //}
     }
 }
