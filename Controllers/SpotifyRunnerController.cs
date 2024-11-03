@@ -72,6 +72,8 @@ namespace spotifyRunnerApp.Controllers
             {
                 return BadRequest("State mismatch error");
             }
+            //get rid of it so that we can optimize memory. We wont be needing this anymore.
+            HttpContext.Session.Remove("OAuthState");
 
             // Retrieve configuration values.
             var clientId = GetConfigValue("Spotify:ClientId");
@@ -87,21 +89,67 @@ namespace spotifyRunnerApp.Controllers
 
             var jsonResponse = await tokenResponse.Content.ReadAsStringAsync();
             var tokenData = JsonSerializer.Deserialize<TokenResponse>(jsonResponse);
-
             var userId = await _spotifyAPIService.GetUserIdFromToken(tokenData.AccessToken);
 
             if (string.IsNullOrEmpty(userId))
             {
                 return BadRequest("Failed to retrieve user id");
             }
-
+            //Store this in order to be able to make calls to db with user id whenever we will need it
+            HttpContext.Session.SetString("UserId", userId);
             // Upsert user information
             await _userService.UpsertUser(userId, tokenData.AccessToken, tokenData.ExpiresIn, tokenData.RefreshToken);
 
             return Ok(new { message = "Access token received", accessToken = tokenData.AccessToken, userId });
         }
 
-       
+        [HttpGet("myLikedSongs")]
+        public async Task<IActionResult> getLikedSongs(int limit = 50, int offset = 0)
+        {
+            string username = HttpContext.Session.GetString("UserId");
+            if (username == null)
+            {
+                return BadRequest("No username provided");
+            }
+            string accessToken = await _userService.GetAccessTokenByUsername(username);
+            if (string.IsNullOrEmpty(accessToken))
+            {
+                return Unauthorized("Access Token missing or invalid");
+            }
+
+            using var httpClient = new HttpClient();
+            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+            // Construct the request URL
+            var requestUrl = $"https://api.spotify.com/v1/me/tracks?limit={limit}&offset={offset}";
+
+            // Make the GET request to Spotify API
+            var response = await httpClient.GetAsync(requestUrl);
+            if (!response.IsSuccessStatusCode)
+            {
+                return BadRequest("Failed to retrieve liked songs from Spotify.");
+            }
+
+            var jsonResponse = await response.Content.ReadAsStringAsync();
+            System.Diagnostics.Debug.WriteLine(jsonResponse);
+
+            var likedSongsData = JsonSerializer.Deserialize<LikedSongsResponse>(jsonResponse);
+            System.Diagnostics.Debug.WriteLine(likedSongsData);
+            var songIds = new List<string>();
+
+            foreach(var item in likedSongsData.Items)
+            {
+                if (item.Track != null)
+                {
+                    songIds.Add(item.Track.Id);
+                }
+            }
+
+            var tempos = await _spotifyAPIService.GetTemposForTracks(songIds, accessToken);
+            System.Diagnostics.Debug.WriteLine("Tempos: " + tempos);
+            return Ok(tempos);
+        }
+
         /**
          * Come back to this by getting db value?  
          **/

@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text;
 using System.Web;
+using Microsoft.EntityFrameworkCore;
 
 namespace SpotifyRunnerApp.Services
 {
@@ -15,6 +16,29 @@ namespace SpotifyRunnerApp.Services
         {
             _configuration = configuration;
             _httpClient = new HttpClient();
+        }
+
+        public async Task<List<AudioFeature>> GetTemposForTracks(List<string> trackIds, string accessToken)
+        {
+            System.Diagnostics.Debug.WriteLine("List of songs: " + trackIds[0]);
+            string ids = string.Join(",", trackIds);
+
+            string url = $"https://api.spotify.com/v1/audio-features?ids={Uri.EscapeDataString(ids)}";
+
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+
+            var response = await _httpClient.SendAsync(request);
+            System.Diagnostics.Debug.WriteLine("Tempo Response: " + response);
+            response.EnsureSuccessStatusCode();
+
+            var jsonResponse = await response.Content.ReadAsStringAsync();
+            System.Diagnostics.Debug.WriteLine("Audio Features: " + jsonResponse);
+            var audioFeaturesResponse = JsonSerializer.Deserialize<AudioFeaturesResponse>(jsonResponse);
+            //System.Diagnostics.Debug.WriteLine("Audio Features: " + audioFeaturesResponse);
+
+
+            return audioFeaturesResponse.AudioFeatures;
         }
 
         public async Task<UserProfile> GetUserProfile(string accessToken)
@@ -64,6 +88,43 @@ namespace SpotifyRunnerApp.Services
 
             return await httpClient.PostAsync("https://accounts.spotify.com/api/token", requestBody);
         }
+
+        public async Task<TokenResponse> RefreshAccessToken(string refreshToken)
+        {
+
+            // Define the endpoint and the payload
+            const string url = "https://accounts.spotify.com/api/token";
+            //var clientId = GetConfigValue("Spotify:ClientId"); // Assuming you have a method to retrieve config values
+           
+            var payload = new
+            {
+                grant_type = "refresh_token",
+                refresh_token = refreshToken,
+                //client_id = clientId
+            };
+
+            using var httpClient = new HttpClient();
+            var response = await httpClient.PostAsync(url, new FormUrlEncodedContent(new[]
+            {
+                new KeyValuePair<string, string>("grant_type", payload.grant_type),
+                new KeyValuePair<string, string>("refresh_token", payload.refresh_token),
+                //new KeyValuePair<string, string>("client_id", payload.client_id),
+            }));
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new Exception("Failed to refresh access token");
+            }
+
+            var jsonResponse = await response.Content.ReadAsStringAsync();
+            var tokenData = JsonSerializer.Deserialize<TokenResponse>(jsonResponse);
+
+            // Here you can upsert the new token data into the database
+            //await UpsertUser(user.Username, tokenData.AccessToken, tokenData.ExpiresIn, tokenData.RefreshToken);
+
+            return tokenData; // Return the token data for further use if needed
+        }
+
 
         public async Task<string> GetUserIdFromToken(string accessToken)
         {
