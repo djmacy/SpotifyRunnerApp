@@ -18,27 +18,82 @@ namespace SpotifyRunnerApp.Services
             _httpClient = new HttpClient();
         }
 
+        public async Task<List<string>> GetAllSavedTrackIds(string accessToken)
+        {
+            int limit = 50;
+            int offset = 0;
+            bool hasMoreTracks = true;
+            var allSongIds = new List<string>();
+
+            using var httpClient = new HttpClient();
+            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+            while (hasMoreTracks)
+            {
+                var requestUrl = $"https://api.spotify.com/v1/me/tracks?limit={limit}&offset={offset}";
+                var response = await httpClient.GetAsync(requestUrl);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new Exception("Failed to retreive liked songs from Spotify");
+                }
+
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+                var likedSongsData = JsonSerializer.Deserialize<LikedSongsResponse>(jsonResponse);
+
+                foreach (var item in likedSongsData.Items)
+                {
+                    if (item.Track != null)
+                    {
+                        allSongIds.Add(item.Track.Id);
+                    }
+                }
+                hasMoreTracks = likedSongsData.Items.Count == limit;
+                offset += limit;
+            }
+            return allSongIds;
+
+        }
+
         public async Task<List<AudioFeature>> GetTemposForTracks(List<string> trackIds, string accessToken)
         {
-            System.Diagnostics.Debug.WriteLine("List of songs: " + trackIds[0]);
-            string ids = string.Join(",", trackIds);
+            var allAudioFeatures = new List<AudioFeature>();
+            //max you can call at a time is 100.
+            int batchSize = 100;
 
-            string url = $"https://api.spotify.com/v1/audio-features?ids={Uri.EscapeDataString(ids)}";
+            for (int i = 0; i < trackIds.Count; i += batchSize)
+            {
+                var trackBatch = trackIds.Skip(i).Take(batchSize).ToList();
+                string ids = string.Join(",", trackBatch);
 
-            var request = new HttpRequestMessage(HttpMethod.Get, url);
-            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+                string url = $"https://api.spotify.com/v1/audio-features?ids={Uri.EscapeDataString(ids)}";
 
-            var response = await _httpClient.SendAsync(request);
-            System.Diagnostics.Debug.WriteLine("Tempo Response: " + response);
-            response.EnsureSuccessStatusCode();
+                var request = new HttpRequestMessage(HttpMethod.Get, url);
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
 
-            var jsonResponse = await response.Content.ReadAsStringAsync();
-            System.Diagnostics.Debug.WriteLine("Audio Features: " + jsonResponse);
-            var audioFeaturesResponse = JsonSerializer.Deserialize<AudioFeaturesResponse>(jsonResponse);
-            //System.Diagnostics.Debug.WriteLine("Audio Features: " + audioFeaturesResponse);
+                var response = await _httpClient.SendAsync(request);
+                //System.Diagnostics.Debug.WriteLine("Tempo Response: " + response);
 
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new Exception($"Failed to retreive audio features for batch starting at index {i}: {response.ReasonPhrase}");
+                }
 
-            return audioFeaturesResponse.AudioFeatures;
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+                //System.Diagnostics.Debug.WriteLine("Audio Features JSON Response: " + jsonResponse);
+
+                var audioFeaturesResponse = JsonSerializer.Deserialize<AudioFeaturesResponse>(jsonResponse);
+
+                if (audioFeaturesResponse?.AudioFeatures != null)
+                {
+                    //var filteredFeatures = audioFeaturesResponse.AudioFeatures
+                    //    .Where(feature => feature.Tempo >= 180 && feature.Tempo <= 200)
+                    //    .ToList();
+
+                    allAudioFeatures.AddRange(audioFeaturesResponse.AudioFeatures);
+                }
+            }
+            return allAudioFeatures;
         }
 
         public async Task<UserProfile> GetUserProfile(string accessToken)

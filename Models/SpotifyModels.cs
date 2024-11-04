@@ -1,6 +1,7 @@
 namespace SpotifyRunnerApp.Models
 {
     using System.Numerics;
+    using System.Text.Json;
     using System.Text.Json.Serialization;
 
     public class TokenResponse
@@ -77,6 +78,9 @@ namespace SpotifyRunnerApp.Models
     public class AudioFeaturesResponse
     {
         [JsonPropertyName("audio_features")]
+        //I dont want all songs so this will run the filter when looping through the response to ensure tempo only in the range of 180-200 are grabbed. This will hopefully make this
+        //run more quickly that way I only loop through the response once. 
+        [JsonConverter(typeof(FilteredAudioFeatureConverter))]
         public List<AudioFeature> AudioFeatures { get; set; }
     }
 
@@ -87,5 +91,42 @@ namespace SpotifyRunnerApp.Models
         [JsonPropertyName("tempo")]
         public float Tempo { get; set; }
     }
+
+    public class FilteredAudioFeatureConverter : JsonConverter<List<AudioFeature>>
+    {
+        public override List<AudioFeature> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var features = new List<AudioFeature>();
+
+            // Read the start of the array
+            if (reader.TokenType != JsonTokenType.StartArray)
+                throw new JsonException();
+
+            // Loop through each item in the array
+            while (reader.Read())
+            {
+                if (reader.TokenType == JsonTokenType.EndArray)
+                    break;
+
+                // Deserialize the item to AudioFeature
+                var feature = JsonSerializer.Deserialize<AudioFeature>(ref reader, options);
+
+                // Only add if tempo is within the desired range
+                if (feature?.Tempo >= 180 && feature.Tempo <= 200)
+                {
+                    features.Add(feature);
+                }
+            }
+
+            return features;
+        }
+
+        public override void Write(Utf8JsonWriter writer, List<AudioFeature> value, JsonSerializerOptions options)
+        {
+            // Implement if you need to serialize the object back to JSON
+            throw new NotImplementedException();
+        }
+    }
+
 
 }
