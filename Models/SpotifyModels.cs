@@ -61,18 +61,18 @@ namespace SpotifyRunnerApp.Models
         [JsonPropertyName("name")]
         public string Name { get; set; }
         
-        [JsonPropertyName("artists")]
-        public List<Artist> Artists { get; set; }
+        //[JsonPropertyName("artists")]
+        //public List<Artist> Artists { get; set; }
     }
 
-    public class Artist
-    {
-        [JsonPropertyName("name")]
-        public string Name { get; set; }
+    //public class Artist
+    //{
+    //    [JsonPropertyName("name")]
+    //    public string Name { get; set; }
 
-        [JsonPropertyName("id")]
-        public string Id { get; set; }
-    }
+    //    [JsonPropertyName("id")]
+    //    public string Id { get; set; }
+    //}
 
     // Models/AudioFeaturesResponse.cs
     public class AudioFeaturesResponse
@@ -90,6 +90,10 @@ namespace SpotifyRunnerApp.Models
         public string Id { get; set; }
         [JsonPropertyName("tempo")]
         public float Tempo { get; set; }
+        [JsonPropertyName("uri")]
+        public string Uri { get; set; }
+        [JsonPropertyName("duration_ms")]
+        public float MsDuration { get; set; }
     }
 
     public class FilteredAudioFeatureConverter : JsonConverter<List<AudioFeature>>
@@ -126,6 +130,22 @@ namespace SpotifyRunnerApp.Models
             // Implement if you need to serialize the object back to JSON
             throw new NotImplementedException();
         }
+    }
+
+    public class Playlist
+    {
+        [JsonPropertyName("id")]
+        public string Id { get; set; }
+        [JsonPropertyName("name")]
+        public string Name { get; set; }
+        [JsonPropertyName("uri")]
+        public string Uri { get; set; }
+    }
+
+    public class PlaylistResponse
+    {
+        [JsonPropertyName("items")]
+        public List<Playlist> Playlists { get; set; }
     }
 
 

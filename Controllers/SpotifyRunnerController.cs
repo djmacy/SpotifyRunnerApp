@@ -118,7 +118,7 @@ namespace spotifyRunnerApp.Controllers
             }
 
             var allSongIds = await _spotifyAPIService.GetAllSavedTrackIds(accessToken);
-
+            //System.Diagnostics.Debug.Write("All songs with URI: " + allSongIds);
             if (allSongIds.Count == 0)
             {
                 return Ok("No saved tracks found.");
@@ -126,7 +126,26 @@ namespace spotifyRunnerApp.Controllers
 
             // Retrieve tempos for all songs
             var tempos = await _spotifyAPIService.GetTemposForTracks(allSongIds, accessToken);
+            var lengthQueued = await _spotifyAPIService.QueueSongs(tempos, accessToken, 10);
+            System.Diagnostics.Debug.WriteLine("Duration: " + lengthQueued);
             return Ok(tempos);
+        }
+
+        [HttpGet("playlists")]
+        public async Task<IActionResult> GetPlaylists()
+        {
+            string username = HttpContext.Session.GetString("UserId");
+            if (String.IsNullOrEmpty(username))
+            {
+                return BadRequest("No username provided");
+            }
+            string accessToken = await _userService.GetAccessTokenByUsername(username);
+            if (string.IsNullOrEmpty(accessToken))
+            {
+                return Unauthorized("Access Token missing or invalid");
+            }
+            var playlists = await _spotifyAPIService.GetUserPlaylists(accessToken);
+            return Ok(playlists);
         }
 
         private string GetConfigValue(string key) => _config[key];
