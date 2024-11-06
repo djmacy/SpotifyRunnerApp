@@ -19,24 +19,34 @@ builder.Services.AddSession(options =>
 });
 builder.Services.AddDistributedMemoryCache();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+//builder.Services.AddEndpointsApiExplorer();
+//builder.Services.AddSwaggerGen();
+
+// Configure CORS to allow requests from the React frontend
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowReactApp", policy =>
+    {
+        policy.WithOrigins("http://localhost:3000") // React app's address
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials(); // Use this if you need cookies or auth tokens
+    });
+});
 
 var app = builder.Build();
 
+
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+//if (app.Environment.IsDevelopment())
+//{
+//    app.UseSwagger();
+//    app.UseSwaggerUI();
+//}
 
 app.UseHttpsRedirection();
-
 app.UseSession();
-
+app.UseCors("AllowReactApp");
 app.UseAuthorization();
-
 app.MapControllers();
-
 app.Run();

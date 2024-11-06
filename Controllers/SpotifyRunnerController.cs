@@ -30,6 +30,7 @@ namespace spotifyRunnerApp.Controllers
         [HttpGet("testjson")]
         public IActionResult TestJson()
         {
+            System.Diagnostics.Debug.WriteLine("Test endpoint hit");
             var data = new
             {
                 message = "Hello, this is a test JSON response",
@@ -134,6 +135,7 @@ namespace spotifyRunnerApp.Controllers
         [HttpGet("playlists")]
         public async Task<IActionResult> GetPlaylists()
         {
+            System.Diagnostics.Debug.WriteLine("GetPlaylists endpoint was called");
             string username = HttpContext.Session.GetString("UserId");
             if (String.IsNullOrEmpty(username))
             {
