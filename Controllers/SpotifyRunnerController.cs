@@ -37,6 +37,7 @@ namespace spotifyRunnerApp.Controllers
                 timestamp = DateTime.Now
             };
             string jsonData = JsonSerializer.Serialize(data);
+            Console.WriteLine(jsonData);
             return Ok(data);
         }
 
@@ -100,8 +101,8 @@ namespace spotifyRunnerApp.Controllers
             HttpContext.Session.SetString("UserId", userId);
             // Upsert user information
             await _userService.UpsertUser(userId, tokenData.AccessToken, tokenData.ExpiresIn, tokenData.RefreshToken);
-
-            return Ok(new { message = "Access token received", accessToken = tokenData.AccessToken, userId });
+            Console.WriteLine(new { message = "Access token received", accessToken = tokenData.AccessToken, userId });
+            return Redirect("http://localhost:3000/home");
         }
 
         [HttpGet("myLikedSongs")]
@@ -148,6 +149,23 @@ namespace spotifyRunnerApp.Controllers
             }
             var playlists = await _spotifyAPIService.GetUserPlaylists(accessToken);
             return Ok(playlists);
+        }
+
+        [HttpGet("popPlaylist")]
+        public async Task<IActionResult> GetPopPlaylists()
+        {
+            string username = HttpContext.Session.GetString("UserId");
+            if (String.IsNullOrEmpty(username))
+            {
+                return BadRequest("No username provided");
+            }
+            string accessToken = await _userService.GetAccessTokenByUsername(username);
+            if (string.IsNullOrEmpty (accessToken))
+            {
+                return Unauthorized("Access Token missing or invalid");
+            }
+            var playlist = await _spotifyAPIService.GetPopPlaylist(accessToken, "506qJc3SgmcFHSLl9g3Rgr");
+            return Ok(playlist);
         }
 
         private string GetConfigValue(string key) => _config[key];

@@ -60,19 +60,39 @@ namespace SpotifyRunnerApp.Models
         
         [JsonPropertyName("name")]
         public string Name { get; set; }
-        
-        //[JsonPropertyName("artists")]
-        //public List<Artist> Artists { get; set; }
+
+        [JsonPropertyName("duration_ms")]
+        public float MsDuration { get; set; }
+
+        [JsonPropertyName("artists")]
+        public List<Artist> Artists { get; set; }
+
+        [JsonPropertyName("album")]
+        public Album Album { get; set; }
     }
 
-    //public class Artist
-    //{
-    //    [JsonPropertyName("name")]
-    //    public string Name { get; set; }
+    public class Album
+    {
+        [JsonPropertyName("id")]
+        public string Id { get; set; }
+        [JsonPropertyName("images")]
+        public List<Image> Image { get; set; }
+    }
 
-    //    [JsonPropertyName("id")]
-    //    public string Id { get; set; }
-    //}
+    public class Image
+    {
+        [JsonPropertyName("url")]
+        public string Url { get; set; }
+    }
+
+    public class Artist
+    {
+        [JsonPropertyName("name")]
+        public string Name { get; set; }
+
+        [JsonPropertyName("id")]
+        public string Id { get; set; }
+    }
 
     // Models/AudioFeaturesResponse.cs
     public class AudioFeaturesResponse
@@ -140,6 +160,26 @@ namespace SpotifyRunnerApp.Models
         public string Name { get; set; }
         [JsonPropertyName("uri")]
         public string Uri { get; set; }
+        [JsonPropertyName("tracks")]
+        public TrackObject Tracks { get; set; }
+    }
+
+    public class TrackObject 
+    {
+        [JsonPropertyName("items")]
+        public List<SongItem> Items { get; set; }
+    }
+
+    public class PlaylistItems
+    {
+        [JsonPropertyName("id")]
+        public string Id { get; set; }
+        [JsonPropertyName("name")]
+        public string Name { get; set; }
+        [JsonPropertyName("uri")]
+        public string Uri { get; set; }
+        [JsonPropertyName("tracks")]
+        public List<SongItem> Tracks { get; set; }
     }
 
     public class PlaylistResponse

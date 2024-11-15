@@ -6,6 +6,8 @@ using System.Web;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http.HttpResults;
+using static System.Net.WebRequestMethods;
+using Microsoft.AspNetCore.Http.Headers;
 
 namespace SpotifyRunnerApp.Services
 {
@@ -32,6 +34,7 @@ namespace SpotifyRunnerApp.Services
             }
         }
 
+
         public async Task<List<Playlist>> GetUserPlaylists(string accessToken)
         {
             string url = "https://api.spotify.com/v1/me/playlists";
@@ -57,6 +60,29 @@ namespace SpotifyRunnerApp.Services
             }
 
             return playlistResponse?.Playlists;
+        }
+
+
+        public async Task<Playlist> GetPopPlaylist(string accessToken, string playlistId)
+        {
+            string url = "https://api.spotify.com/v1/playlists/" + playlistId;
+
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+
+            var response = await _httpClient.SendAsync(request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new Exception($"Failed to retreive playlist: {response.ReasonPhrase}");
+            }
+
+            var jsonResponse = await response.Content.ReadAsStringAsync();
+            Console.WriteLine("Playlists Response: " + jsonResponse);
+
+            var playlist = JsonSerializer.Deserialize<Playlist>(jsonResponse);
+            Console.WriteLine(playlist);
+            return playlist;
         }
 
         public async Task<String> QueueSongs(List<AudioFeature> tempos, string accessToken, float duration)
