@@ -69,6 +69,9 @@ namespace SpotifyRunnerApp.Models
 
         [JsonPropertyName("album")]
         public Album Album { get; set; }
+
+        [JsonPropertyName("uri")]
+        public string Uri { get; set; }
     }
 
     public class Album
@@ -186,6 +189,19 @@ namespace SpotifyRunnerApp.Models
     {
         [JsonPropertyName("items")]
         public List<Playlist> Playlists { get; set; }
+    }
+
+    public class QueueResult
+    {
+        public string Uri { get; set; }
+        public bool Success { get; set; }
+        public string ErrorMessage { get; set; }
+    }
+
+    public class QueueResponse
+    {
+        public int TotalQueued { get; set; }
+        public List<QueueResult> Failed { get; set; }
     }
 
 

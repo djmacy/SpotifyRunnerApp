@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http.HttpResults;
 using static System.Net.WebRequestMethods;
 using Microsoft.AspNetCore.Http.Headers;
+using System.Net.Http;
 
 namespace SpotifyRunnerApp.Services
 {
@@ -16,23 +17,23 @@ namespace SpotifyRunnerApp.Services
         private readonly IConfiguration _configuration;
         private readonly HttpClient _httpClient;
 
-        public SpotifyAPIService(IConfiguration configuration)
+        public SpotifyAPIService(HttpClient httpClient, IConfiguration configuration)
         {
             _configuration = configuration;
-            _httpClient = new HttpClient();
+            _httpClient = httpClient;
         }
 
-        [ApiController]
-        [Route("api/[controller]")]
-        public class SpotifyController : ControllerBase
-        {
-            private readonly HttpClient _httpClient;
+        //[ApiController]
+        //[Route("api/[controller]")]
+        //public class SpotifyController : ControllerBase
+        //{
+        //    private readonly HttpClient _httpClient;
 
-            public SpotifyController(HttpClient httpClient)
-            {
-                _httpClient = httpClient;
-            }
-        }
+        //    public SpotifyController(HttpClient httpClient)
+        //    {
+        //        _httpClient = httpClient;
+        //    }
+        //}
 
 
         public async Task<List<Playlist>> GetUserPlaylists(string accessToken)
@@ -50,7 +51,7 @@ namespace SpotifyRunnerApp.Services
             }
 
             var jsonResponse = await response.Content.ReadAsStringAsync();
-            System.Diagnostics.Debug.WriteLine("Playlists JSON Response: " + jsonResponse);
+            //System.Diagnostics.Debug.WriteLine("Playlists JSON Response: " + jsonResponse);
 
             var playlistResponse = JsonSerializer.Deserialize<PlaylistResponse>(jsonResponse);
             
@@ -63,7 +64,7 @@ namespace SpotifyRunnerApp.Services
         }
 
 
-        public async Task<Playlist> GetPopPlaylist(string accessToken, string playlistId)
+        public async Task<Playlist> GetPlaylist(string accessToken, string playlistId)
         {
             string url = "https://api.spotify.com/v1/playlists/" + playlistId;
 
@@ -78,10 +79,10 @@ namespace SpotifyRunnerApp.Services
             }
 
             var jsonResponse = await response.Content.ReadAsStringAsync();
-            Console.WriteLine("Playlists Response: " + jsonResponse);
+           // Console.WriteLine("Playlists Response: " + jsonResponse);
 
             var playlist = JsonSerializer.Deserialize<Playlist>(jsonResponse);
-            Console.WriteLine(playlist);
+            //Console.WriteLine(playlist);
             return playlist;
         }
 
@@ -121,6 +122,39 @@ namespace SpotifyRunnerApp.Services
                 }
             }
             return string.Format("{0:N2}", currentDuration);
+        }
+
+        public async Task<QueueResponse> QueueDemoPlaylist(List<string> uris, string accessToken)
+        {
+            if (string.IsNullOrEmpty(accessToken))
+            {
+                throw new Exception("No access token provided");
+            }
+
+            var results = new List<QueueResult>();
+
+            foreach (var uri in uris)
+            {
+                string url = $"https://api.spotify.com/v1/me/player/queue?uri={Uri.EscapeDataString(uri)}";
+
+                var request = new HttpRequestMessage(HttpMethod.Post, url);
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+
+                var response = await _httpClient.SendAsync(request);
+                var result = new QueueResult
+                {
+                    Uri = uri,
+                    Success = response.IsSuccessStatusCode,
+                    ErrorMessage = response.IsSuccessStatusCode ? null : response.ReasonPhrase
+                };
+                results.Add(result);
+            }
+
+            return new QueueResponse
+            {
+                TotalQueued = results.Count(r => r.Success),
+                Failed = results.Where(r => !r.Success).ToList()
+            };
         }
 
         public async Task<List<string>> GetAllSavedTrackIds(string accessToken)
