@@ -36,31 +36,52 @@ namespace SpotifyRunnerApp.Services
         //}
 
 
-        public async Task<List<Playlist>> GetUserPlaylists(string accessToken)
+        public async Task<List<PlaylistItems>> GetUserPlaylists(string accessToken)
         {
             string url = "https://api.spotify.com/v1/me/playlists";
+            int limit = 50; // Maximum allowed by the API
+            int maxPlaylists = 200; // Adjust this to the maximum number you want to retrieve
+            int offset = 0;
+            List<PlaylistItems> allPlaylists = new List<PlaylistItems>();
 
-            var request = new HttpRequestMessage(HttpMethod.Get, url);
-            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
-
-            var response = await _httpClient.SendAsync(request);
-
-            if (!response.IsSuccessStatusCode)
+            while (allPlaylists.Count < maxPlaylists)
             {
-                throw new Exception($"Failed to retreive playlists: {response.ReasonPhrase}");
+                // Build the request URL with limit and offset
+                string requestUrl = $"{url}?limit={limit}&offset={offset}";
+
+                var request = new HttpRequestMessage(HttpMethod.Get, requestUrl);
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+
+                var response = await _httpClient.SendAsync(request);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    throw new Exception($"Failed to retrieve playlists: {response.ReasonPhrase}");
+                }
+
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+                Console.WriteLine(jsonResponse);
+                var playlistResponse = JsonSerializer.Deserialize<PlaylistResponse>(jsonResponse);
+                //Console.WriteLine(playlistResponse.name)
+                if (playlistResponse?.PlaylistsItems == null || playlistResponse.PlaylistsItems.Count == 0)
+                {
+                    break; // Exit the loop if no more playlists are returned
+                }
+
+                allPlaylists.AddRange(playlistResponse.PlaylistsItems);
+
+                // Increment the offset for the next batch
+                offset += limit;
+
+                // Stop if we reach the maximum number of playlists or the total returned by the API
+                if (playlistResponse.PlaylistsItems.Count < limit)
+                {
+                    break; // Exit the loop if there are fewer items than requested
+                }
             }
-
-            var jsonResponse = await response.Content.ReadAsStringAsync();
-            //System.Diagnostics.Debug.WriteLine("Playlists JSON Response: " + jsonResponse);
-
-            var playlistResponse = JsonSerializer.Deserialize<PlaylistResponse>(jsonResponse);
-            
-            if (playlistResponse.Playlists.Count == 0)
-            {
-                return new List<Playlist>();
-            }
-
-            return playlistResponse?.Playlists;
+            //Console.WriteLine(allPlaylists.Count);
+            // Limit the result to the maximum requested playlists
+            return allPlaylists.Take(maxPlaylists).ToList();
         }
 
 

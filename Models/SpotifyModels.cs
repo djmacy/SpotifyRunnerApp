@@ -181,14 +181,15 @@ namespace SpotifyRunnerApp.Models
         public string Name { get; set; }
         [JsonPropertyName("uri")]
         public string Uri { get; set; }
-        [JsonPropertyName("tracks")]
-        public List<SongItem> Tracks { get; set; }
+
+        [JsonPropertyName("images")]
+        public List<Image> Image { get; set; }
     }
 
     public class PlaylistResponse
     {
         [JsonPropertyName("items")]
-        public List<Playlist> Playlists { get; set; }
+        public List<PlaylistItems> PlaylistsItems { get; set; }
     }
 
     public class QueueResult
