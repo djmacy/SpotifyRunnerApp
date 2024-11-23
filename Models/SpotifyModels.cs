@@ -103,7 +103,6 @@ namespace SpotifyRunnerApp.Models
         [JsonPropertyName("audio_features")]
         //I dont want all songs so this will run the filter when looping through the response to ensure tempo only in the range of 180-200 are grabbed. This will hopefully make this
         //run more quickly that way I only loop through the response once. 
-        [JsonConverter(typeof(FilteredAudioFeatureConverter))]
         public List<AudioFeature> AudioFeatures { get; set; }
     }
 
@@ -121,6 +120,13 @@ namespace SpotifyRunnerApp.Models
 
     public class FilteredAudioFeatureConverter : JsonConverter<List<AudioFeature>>
     {
+        private readonly TempoBounds _bounds;
+
+        public FilteredAudioFeatureConverter(TempoBounds bounds)
+        {
+            _bounds = bounds;
+        }
+
         public override List<AudioFeature> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             var features = new List<AudioFeature>();
@@ -139,12 +145,11 @@ namespace SpotifyRunnerApp.Models
                 var feature = JsonSerializer.Deserialize<AudioFeature>(ref reader, options);
 
                 // Only add if tempo is within the desired range
-                if (feature?.Tempo >= 180 && feature.Tempo <= 200)
+                if (feature?.Tempo >= _bounds.LowerBound && feature.Tempo <= _bounds.UpperBound)
                 {
                     features.Add(feature);
                 }
             }
-
             return features;
         }
 
@@ -153,6 +158,12 @@ namespace SpotifyRunnerApp.Models
             // Implement if you need to serialize the object back to JSON
             throw new NotImplementedException();
         }
+    }
+
+    public class TempoBounds
+    {
+        public float LowerBound { get; set; }
+        public float UpperBound { get; set; }
     }
 
     public class Playlist
@@ -184,12 +195,46 @@ namespace SpotifyRunnerApp.Models
 
         [JsonPropertyName("images")]
         public List<Image> Image { get; set; }
+        
+        [JsonPropertyName("items")]
+        public List<SongItem> Items { get; set; }
     }
 
     public class PlaylistResponse
     {
         [JsonPropertyName("items")]
         public List<PlaylistItems> PlaylistsItems { get; set; }
+    }
+
+    public class CustomPlaylistResponse
+    {
+        [JsonPropertyName("href")]
+        public string Href { get; set; }
+
+        [JsonPropertyName("limit")]
+        public int Limit { get; set; }
+
+        [JsonPropertyName("next")]
+        public string Next { get; set; }
+
+        [JsonPropertyName("offset")]
+        public int Offset { get; set; }
+
+        [JsonPropertyName("previous")]
+        public string Previous { get; set; }
+
+        [JsonPropertyName("total")]
+        public int Total { get; set; }
+
+        [JsonPropertyName("items")]
+        public List<SongItem> Items { get; set; }
+    }
+
+    public class FilterSongsRequest
+    {
+        public List<string> Playlists { get; set; }
+        public float LowerBound { get; set; }
+        public float UpperBound { get; set; }
     }
 
     public class QueueResult

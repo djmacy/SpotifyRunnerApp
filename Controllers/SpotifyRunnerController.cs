@@ -127,7 +127,7 @@ namespace spotifyRunnerApp.Controllers
             }
 
             // Retrieve tempos for all songs
-            var tempos = await _spotifyAPIService.GetTemposForTracks(allSongIds, accessToken);
+            var tempos = await _spotifyAPIService.GetTemposForTracks(allSongIds, accessToken,100, 150);
             var lengthQueued = await _spotifyAPIService.QueueSongs(tempos, accessToken, 10);
             System.Diagnostics.Debug.WriteLine("Duration: " + lengthQueued);
             return Ok(tempos);
@@ -225,6 +225,48 @@ namespace spotifyRunnerApp.Controllers
             return Ok(queuePlaylistResponse);
         }
 
+        [HttpPost("getFilteredSongs")]
+        public async Task<IActionResult> FilterSongs([FromBody] FilterSongsRequest request)
+        {
+            string username = HttpContext.Session.GetString("UserId");
+            if (String.IsNullOrEmpty(username))
+            {
+                return BadRequest(new { message = "No username provided" });
+            }
+            string accessToken = await _userService.GetAccessTokenByUsername(username);
+            if (String.IsNullOrEmpty(accessToken))
+            {
+                return Unauthorized(new { message = "Access Token missing or invalid" });
+            }
+
+            var songs = await _spotifyAPIService.GetSongsFromPlaylist(request.Playlists, accessToken);
+            if (songs == null || !songs.Any())
+            {
+                return NotFound(new { message = "No songs found in playlists" });
+            }
+
+            // Step 2: Extract `ids` efficiently using LINQ
+            var trackIds = songs
+                .Select(song => song.Id) // Assuming `song.Id` contains the track ID
+                .Where(id => !string.IsNullOrEmpty(id)) // Exclude null or empty IDs
+                .Distinct() // Remove duplicates if needed
+                .ToList();
+
+            if (!trackIds.Any())
+            {
+                return NotFound(new { message = "No valid track IDs found" });
+            }
+
+            // Step 3: Fetch tempos for the extracted track IDs
+            var audioFeatures = await _spotifyAPIService.GetTemposForTracks(trackIds, accessToken, request.LowerBound, request.UpperBound);
+            if (audioFeatures == null || !audioFeatures.Any())
+            {
+                return Ok(new { message = "No audio features found for the specified tracks and bounds", data = new List<AudioFeature>() });
+            }
+
+            return Ok(audioFeatures);
+
+        }
         [HttpGet("isSpotifyLoggedIn")]
         public IActionResult IsSpotifyLoggedIn()
         {

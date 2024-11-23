@@ -178,6 +178,54 @@ namespace SpotifyRunnerApp.Services
             };
         }
 
+        public async Task<List<Track>> GetSongsFromPlaylist(List<string> playlists, string accessToken)
+        {
+            if (string.IsNullOrEmpty(accessToken))
+            {
+                throw new Exception("No access token provided");
+            }
+
+            var results = new List<Track>();
+
+            foreach (var playlistId in playlists)
+            {
+                string url = $"https://api.spotify.com/v1/playlists/{playlistId}/tracks";
+
+                do
+                {
+                    var request = new HttpRequestMessage(HttpMethod.Get, url);
+                    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+
+                    var response = await _httpClient.SendAsync(request);
+
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        throw new Exception($"Failed to retrieve tracks for playlist {playlistId}: {response.ReasonPhrase}");
+                    }
+
+                    var jsonResponse = await response.Content.ReadAsStringAsync();
+
+                    // Deserialize the JSON response
+                    var playlistResponse = JsonSerializer.Deserialize<CustomPlaylistResponse>(jsonResponse);
+
+                    if (playlistResponse?.Items != null)
+                    {
+                        // Flatten and add all tracks from the playlist to the results
+                        foreach (var item in playlistResponse.Items)
+                        {                      
+                            results.Add(item.Track);
+                        }
+                    }
+
+                    // Update URL to the next page of results
+                    url = playlistResponse?.Next;
+
+                } while (!string.IsNullOrEmpty(url));
+            }
+
+            return results;
+        }
+
         public async Task<List<string>> GetAllSavedTrackIds(string accessToken)
         {
             int limit = 50;
@@ -215,11 +263,12 @@ namespace SpotifyRunnerApp.Services
 
         }
 
-        public async Task<List<AudioFeature>> GetTemposForTracks(List<string> trackIds, string accessToken)
+        public async Task<List<AudioFeature>> GetTemposForTracks(List<string> trackIds, string accessToken, float lowerBound, float upperBound)
         {
             var allAudioFeatures = new List<AudioFeature>();
             //max you can call at a time is 100.
             int batchSize = 100;
+            var tempoBounds = new TempoBounds { LowerBound = lowerBound, UpperBound = upperBound };
 
             for (int i = 0; i < trackIds.Count; i += batchSize)
             {
@@ -241,8 +290,10 @@ namespace SpotifyRunnerApp.Services
 
                 var jsonResponse = await response.Content.ReadAsStringAsync();
                 //System.Diagnostics.Debug.WriteLine("Audio Features JSON Response: " + jsonResponse);
+                var options = new JsonSerializerOptions();
+                options.Converters.Add(new FilteredAudioFeatureConverter(tempoBounds));
 
-                var audioFeaturesResponse = JsonSerializer.Deserialize<AudioFeaturesResponse>(jsonResponse);
+                var audioFeaturesResponse = JsonSerializer.Deserialize<AudioFeaturesResponse>(jsonResponse, options);
 
                 if (audioFeaturesResponse?.AudioFeatures != null)
                 {
