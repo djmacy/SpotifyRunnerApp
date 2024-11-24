@@ -239,34 +239,49 @@ namespace spotifyRunnerApp.Controllers
                 return Unauthorized(new { message = "Access Token missing or invalid" });
             }
 
-            var songs = await _spotifyAPIService.GetSongsFromPlaylist(request.Playlists, accessToken);
-            if (songs == null || !songs.Any())
+            // Step 1: Fetch all songs from the playlist
+            var songItems = await _spotifyAPIService.GetSongsFromPlaylist(request.Playlists, accessToken);
+            if (songItems == null || !songItems.Any())
             {
                 return NotFound(new { message = "No songs found in playlists" });
             }
 
-            // Step 2: Extract `ids` efficiently using LINQ
-            var trackIds = songs
-                .Select(song => song.Id) // Assuming `song.Id` contains the track ID
-                .Where(id => !string.IsNullOrEmpty(id)) // Exclude null or empty IDs
-                .Distinct() // Remove duplicates if needed
-                .ToList();
+            // Step 2: Extract track IDs from the song items
+            var trackMetadata = songItems
+                .Select(item => item.Track)
+                .Where(track => track != null && !string.IsNullOrEmpty(track.Id)) // Exclude null or invalid tracks
+                .DistinctBy(track => track.Id) // Ensure uniqueness by track ID
+                .ToDictionary(track => track.Id); // Map by track ID for efficient lookup
+
+            var trackIds = trackMetadata.Keys.ToList();
 
             if (!trackIds.Any())
             {
                 return NotFound(new { message = "No valid track IDs found" });
             }
 
-            // Step 3: Fetch tempos for the extracted track IDs
+            // Step 3: Fetch audio features for the extracted track IDs
             var audioFeatures = await _spotifyAPIService.GetTemposForTracks(trackIds, accessToken, request.LowerBound, request.UpperBound);
             if (audioFeatures == null || !audioFeatures.Any())
             {
                 return Ok(new { message = "No audio features found for the specified tracks and bounds", data = new List<AudioFeature>() });
             }
 
-            return Ok(audioFeatures);
+            // Step 4: Combine filtered audio features with track metadata
+            var filteredSongs = audioFeatures
+                .Where(feature => feature.Tempo >= request.LowerBound && feature.Tempo <= request.UpperBound) // Filter by tempo range
+                .Select(feature => new
+                {
+                    AudioFeature = feature,
+                    Metadata = trackMetadata.TryGetValue(feature.Id, out var metadata) ? metadata : null
+                })
+                .Where(combined => combined.Metadata != null) // Ensure only valid combinations are included
+                .ToList();
 
+            // Step 5: Return the combined result
+            return Ok(filteredSongs);
         }
+
         [HttpGet("isSpotifyLoggedIn")]
         public IActionResult IsSpotifyLoggedIn()
         {

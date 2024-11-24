@@ -184,6 +184,12 @@ namespace SpotifyRunnerApp.Models
         public List<SongItem> Items { get; set; }
     }
 
+    public class PlaylistTrack
+    {
+        [JsonPropertyName("total")]
+        public int TotalTracks { get; set; }
+    }
+
     public class PlaylistItems
     {
         [JsonPropertyName("id")]
@@ -198,6 +204,9 @@ namespace SpotifyRunnerApp.Models
         
         [JsonPropertyName("items")]
         public List<SongItem> Items { get; set; }
+
+        [JsonPropertyName("tracks")]
+        public PlaylistTrack PlaylistTrack { get; set; }
     }
 
     public class PlaylistResponse

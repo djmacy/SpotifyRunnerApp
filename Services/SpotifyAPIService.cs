@@ -178,14 +178,14 @@ namespace SpotifyRunnerApp.Services
             };
         }
 
-        public async Task<List<Track>> GetSongsFromPlaylist(List<string> playlists, string accessToken)
+        public async Task<List<SongItem>> GetSongsFromPlaylist(List<string> playlists, string accessToken)
         {
             if (string.IsNullOrEmpty(accessToken))
             {
                 throw new Exception("No access token provided");
             }
 
-            var results = new List<Track>();
+            var results = new List<SongItem>();
 
             foreach (var playlistId in playlists)
             {
@@ -210,11 +210,8 @@ namespace SpotifyRunnerApp.Services
 
                     if (playlistResponse?.Items != null)
                     {
-                        // Flatten and add all tracks from the playlist to the results
-                        foreach (var item in playlistResponse.Items)
-                        {                      
-                            results.Add(item.Track);
-                        }
+                        // Add all `SongItem` objects to the results list
+                        results.AddRange(playlistResponse.Items);
                     }
 
                     // Update URL to the next page of results
@@ -225,6 +222,7 @@ namespace SpotifyRunnerApp.Services
 
             return results;
         }
+
 
         public async Task<List<string>> GetAllSavedTrackIds(string accessToken)
         {
