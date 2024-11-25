@@ -119,18 +119,18 @@ namespace spotifyRunnerApp.Controllers
                 return Unauthorized("Access Token missing or invalid");
             }
 
-            var allSongIds = await _spotifyAPIService.GetAllSavedTrackIds(accessToken);
+            var allSongItems = await _spotifyAPIService.GetAllSavedTracks(accessToken);
             //System.Diagnostics.Debug.Write("All songs with URI: " + allSongIds);
-            if (allSongIds.Count == 0)
+            if (allSongItems.Count == 0)
             {
                 return Ok("No saved tracks found.");
             }
 
             // Retrieve tempos for all songs
-            var tempos = await _spotifyAPIService.GetTemposForTracks(allSongIds, accessToken,100, 150);
-            var lengthQueued = await _spotifyAPIService.QueueSongs(tempos, accessToken, 10);
-            System.Diagnostics.Debug.WriteLine("Duration: " + lengthQueued);
-            return Ok(tempos);
+            //var tempos = await _spotifyAPIService.GetTemposForTracks(allSongIds, accessToken,100, 150);
+            //var lengthQueued = await _spotifyAPIService.QueueSongs(tempos, accessToken, 10);
+            //System.Diagnostics.Debug.WriteLine("Duration: " + lengthQueued);
+            return Ok(allSongItems);
         }
 
         [HttpGet("playlists")]
@@ -280,6 +280,35 @@ namespace spotifyRunnerApp.Controllers
 
             // Step 5: Return the combined result
             return Ok(filteredSongs);
+        }
+
+        [HttpPost("getFilteredLikedSongs")]
+        public async Task<IActionResult> FilterLikedSongs([FromBody] FilterLikedSongsRequest request)
+        {
+            string username = HttpContext.Session.GetString("UserId");
+            if (String.IsNullOrEmpty(username))
+            {
+                return BadRequest(new { message = "No username provided" });
+            }
+            string accessToken = await _userService.GetAccessTokenByUsername(username);
+            if (String.IsNullOrEmpty(accessToken))
+            {
+                return Unauthorized(new { message = "Access Token missing or invalid" });
+            }
+
+            var trackIds = request.SongIds;
+            if (!trackIds.Any())
+            {
+                return NotFound(new { message = "No valid track IDs found" });
+            }
+
+            // Step 3: Fetch audio features for the extracted track IDs
+            var audioFeatures = await _spotifyAPIService.GetTemposForTracks(trackIds, accessToken, request.LowerBound, request.UpperBound);
+            if (audioFeatures == null || !audioFeatures.Any())
+            {
+                return Ok(new { message = "No audio features found for the specified tracks and bounds", data = new List<AudioFeature>() });
+            }
+            return Ok(audioFeatures);
         }
 
         [HttpGet("isSpotifyLoggedIn")]

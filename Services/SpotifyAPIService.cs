@@ -224,41 +224,40 @@ namespace SpotifyRunnerApp.Services
         }
 
 
-        public async Task<List<string>> GetAllSavedTrackIds(string accessToken)
+        public async Task<List<SongItem>> GetAllSavedTracks(string accessToken)
         {
-            int limit = 50;
-            int offset = 0;
-            bool hasMoreTracks = true;
-            var allSongIds = new List<string>();
-
+           if (string.IsNullOrEmpty(accessToken))
+            {
+                throw new Exception("Access token missing or expired");
+            }
+            var results = new List<SongItem>();
+            string url = "https://api.spotify.com/v1/me/tracks";
+            
             using var httpClient = new HttpClient();
             httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
 
-            while (hasMoreTracks)
+            do
             {
-                var requestUrl = $"https://api.spotify.com/v1/me/tracks?limit={limit}&offset={offset}";
-                var response = await httpClient.GetAsync(requestUrl);
+                var request = new HttpRequestMessage(HttpMethod.Get, url);
+                var response = await httpClient.SendAsync(request);
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    throw new Exception("Failed to retreive liked songs from Spotify");
+                    throw new Exception($"Failed to retreive like songs: {response.ReasonPhrase}");
                 }
 
                 var jsonResponse = await response.Content.ReadAsStringAsync();
-                var likedSongsData = JsonSerializer.Deserialize<LikedSongsResponse>(jsonResponse);
-
-                foreach (var item in likedSongsData.Items)
+                //the response is the same for likedsongs and customplaylsits response so I will need to refactor name later
+                var likedSongsResponse = JsonSerializer.Deserialize<CustomPlaylistResponse>(jsonResponse);
+                
+                if (likedSongsResponse?.Items != null)
                 {
-                    if (item.Track != null)
-                    {
-                        allSongIds.Add(item.Track.Id);
-                    }
+                    results.AddRange(likedSongsResponse.Items);
                 }
-                hasMoreTracks = likedSongsData.Items.Count == limit;
-                offset += limit;
-            }
-            return allSongIds;
+                url = likedSongsResponse?.Next;
+            } while (!string.IsNullOrEmpty(url));
 
+            return results;
         }
 
         public async Task<List<AudioFeature>> GetTemposForTracks(List<string> trackIds, string accessToken, float lowerBound, float upperBound)

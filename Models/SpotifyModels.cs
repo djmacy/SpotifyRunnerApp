@@ -198,13 +198,10 @@ namespace SpotifyRunnerApp.Models
         public string Name { get; set; }
         [JsonPropertyName("uri")]
         public string Uri { get; set; }
-
         [JsonPropertyName("images")]
         public List<Image> Image { get; set; }
-        
         [JsonPropertyName("items")]
         public List<SongItem> Items { get; set; }
-
         [JsonPropertyName("tracks")]
         public PlaylistTrack PlaylistTrack { get; set; }
     }
@@ -242,6 +239,13 @@ namespace SpotifyRunnerApp.Models
     public class FilterSongsRequest
     {
         public List<string> Playlists { get; set; }
+        public float LowerBound { get; set; }
+        public float UpperBound { get; set; }
+    }
+
+    public class FilterLikedSongsRequest
+    {
+        public List<string> SongIds { get; set; }
         public float LowerBound { get; set; }
         public float UpperBound { get; set; }
     }
