@@ -145,7 +145,7 @@ namespace SpotifyRunnerApp.Services
             return string.Format("{0:N2}", currentDuration);
         }
 
-        public async Task<QueueResponse> QueueDemoPlaylist(List<string> uris, string accessToken)
+        public async Task<QueueResponse> QueueDemoPlaylist(List<string> uris, string accessToken, string deviceId = null)
         {
             if (string.IsNullOrEmpty(accessToken))
             {
@@ -157,6 +157,10 @@ namespace SpotifyRunnerApp.Services
             foreach (var uri in uris)
             {
                 string url = $"https://api.spotify.com/v1/me/player/queue?uri={Uri.EscapeDataString(uri)}";
+                if (!string.IsNullOrEmpty(deviceId))
+                {
+                    url += $"&device_id={Uri.EscapeDataString(deviceId)}";
+                }
 
                 var request = new HttpRequestMessage(HttpMethod.Post, url);
                 request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
@@ -177,6 +181,7 @@ namespace SpotifyRunnerApp.Services
                 Failed = results.Where(r => !r.Success).ToList()
             };
         }
+
 
         public async Task<List<SongItem>> GetSongsFromPlaylist(List<string> playlists, string accessToken)
         {
@@ -333,6 +338,36 @@ namespace SpotifyRunnerApp.Services
             else
             {
                 throw new InvalidOperationException("Failed to retrieve user profile");
+            }
+        }
+
+        public async Task<DevicesResponse> GetDevices(string accessToken)
+        {
+            if (string.IsNullOrEmpty (accessToken))
+            {
+                throw new Exception("Access token missing or expired");
+            }
+            using var httpClient = new HttpClient();
+            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+            var response = await httpClient.GetAsync("https://api.spotify.com/v1/me/player/devices");
+            if (response.IsSuccessStatusCode)
+            {
+                var jsonResponse = await response.Content.ReadAsStringAsync();
+                var devices = JsonSerializer.Deserialize<DevicesResponse>(jsonResponse);
+                if (devices != null)
+                {
+                    return devices;
+                }
+                else
+                {
+                    throw new InvalidOperationException("Failed to deserialize user profile");
+                }
+            }
+            else
+            {
+                var errorDetails = await response.Content.ReadAsStringAsync();
+                throw new InvalidOperationException($"Failed to retrieve devices: {response.StatusCode}. Response: {errorDetails}");
             }
         }
 

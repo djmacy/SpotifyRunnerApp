@@ -30,6 +30,25 @@ namespace SpotifyRunnerApp.Models
 
         [JsonPropertyName("email")]
         public string Email { get; set; }
+
+        [JsonPropertyName("product")]
+        public string Product { get; set; }
+    }
+
+    public class DevicesResponse
+    {
+        [JsonPropertyName("devices")]
+        public List<Devices> Devices { get; set; }
+    }
+
+    public class Devices
+    {
+        [JsonPropertyName("id")]
+        public string Id { get; set; }
+        [JsonPropertyName("type")]
+        public string Type { get; set; }
+        [JsonPropertyName("name")]
+        public string Name { get; set; }
     }
 
     // Models/LikedSongsResponse.cs
@@ -248,6 +267,12 @@ namespace SpotifyRunnerApp.Models
         public List<string> SongIds { get; set; }
         public float LowerBound { get; set; }
         public float UpperBound { get; set; }
+    }
+
+    public class QueuePlaylistRequest
+    {
+        public List<string> Uris { get; set; }
+        public string DeviceId { get; set; }
     }
 
     public class QueueResult

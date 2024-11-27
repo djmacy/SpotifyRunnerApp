@@ -133,6 +133,53 @@ namespace spotifyRunnerApp.Controllers
             return Ok(allSongItems);
         }
 
+        [HttpGet("getDevices")]
+        public async Task<IActionResult> getDevices()
+        {
+            string username = HttpContext.Session.GetString("UserId");
+            if (username == null)
+            {
+                return BadRequest("No username provided");
+            }
+            string accessToken = await _userService.GetAccessTokenByUsername(username);
+            Console.WriteLine(accessToken);
+            if (string.IsNullOrEmpty(accessToken))
+            {
+                return Unauthorized("Access Token missing or invalid");
+            }
+
+            var devicesResponse = await _spotifyAPIService.GetDevices(accessToken);
+
+            return Ok(devicesResponse);
+        }
+
+        [HttpGet("isPremium")]
+public async Task<IActionResult> isPremium()
+{
+    string username = HttpContext.Session.GetString("UserId");
+    if (username == null)
+    {
+        return BadRequest(new { error = "No username provided" });
+    }
+
+    string accessToken = await _userService.GetAccessTokenByUsername(username);
+    if (string.IsNullOrEmpty(accessToken))
+    {
+        return Unauthorized(new { error = "AccessToken is missing or invalid" });
+    }
+
+    var isPremiumResponse = await _spotifyAPIService.GetUserProfile(accessToken);
+    if (isPremiumResponse == null)
+    {
+        return BadRequest(new { error = "No profile found" });
+    }
+
+    // Return JSON object instead of plain string
+    return Ok(new { product = isPremiumResponse.Product });
+}
+
+
+
         [HttpGet("playlists")]
         public async Task<IActionResult> GetPlaylists()
         {
@@ -203,25 +250,21 @@ namespace spotifyRunnerApp.Controllers
         }
 
         [HttpPost("queuePlaylist")]
-        public async Task<IActionResult> QueuePlaylist([FromBody] List<string> uris)
+        public async Task<IActionResult> QueuePlaylist([FromBody] QueuePlaylistRequest request)
         {
             string username = HttpContext.Session.GetString("UserId");
-            if (String.IsNullOrEmpty(username)) 
+            if (string.IsNullOrEmpty(username))
             {
-                // Log session state for debugging
-               // Console.WriteLine("Session Keys:");
-                //foreach (var key in HttpContext.Session.Keys)
-                //{
-                //   //Console.WriteLine($"Key: {key}, Value: {HttpContext.Session.GetString(key)}");
-                //}
                 return BadRequest(new { message = "No username provided" });
             }
+
             string accessToken = await _userService.GetAccessTokenByUsername(username);
-            if (string.IsNullOrEmpty(accessToken)) 
+            if (string.IsNullOrEmpty(accessToken))
             {
                 return Unauthorized(new { message = "Access Token missing or invalid" });
             }
-            var queuePlaylistResponse = await _spotifyAPIService.QueueDemoPlaylist(uris, accessToken);
+
+            var queuePlaylistResponse = await _spotifyAPIService.QueueDemoPlaylist(request.Uris, accessToken, request.DeviceId);
             return Ok(queuePlaylistResponse);
         }
 
