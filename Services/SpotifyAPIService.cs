@@ -389,25 +389,34 @@ namespace SpotifyRunnerApp.Services
 
         public async Task<TokenResponse> RefreshAccessToken(string refreshToken)
         {
-
             // Define the endpoint and the payload
             const string url = "https://accounts.spotify.com/api/token";
-            //var clientId = GetConfigValue("Spotify:ClientId"); // Assuming you have a method to retrieve config values
-           
-            var payload = new
-            {
-                grant_type = "refresh_token",
-                refresh_token = refreshToken,
-                //client_id = clientId
-            };
+            var clientId = _configuration["Spotify:ClientId"]; // Retrieve your client_id from your config
+            var clientSecret = _configuration["Spotify:ClientSecret"]; // Retrieve your client_secret from your config
+
+            // Create Base64 encoded client_id:client_secret for Authorization header
+            var clientCredentials = $"{clientId}:{clientSecret}";
+            var encodedCredentials = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(clientCredentials));
+
+            // Define the payload for the POST request
+            var payload = new Dictionary<string, string>
+    {
+        { "grant_type", "refresh_token" },
+        { "refresh_token", refreshToken },
+    };
 
             using var httpClient = new HttpClient();
-            var response = await httpClient.PostAsync(url, new FormUrlEncodedContent(new[]
+
+            // Prepare the request with proper headers
+            var requestMessage = new HttpRequestMessage(HttpMethod.Post, url)
             {
-                new KeyValuePair<string, string>("grant_type", payload.grant_type),
-                new KeyValuePair<string, string>("refresh_token", payload.refresh_token),
-                //new KeyValuePair<string, string>("client_id", payload.client_id),
-            }));
+                Content = new FormUrlEncodedContent(payload)
+            };
+
+            requestMessage.Headers.Add("Authorization", $"Basic {encodedCredentials}");
+            requestMessage.Headers.Add("Content-Type", "application/x-www-form-urlencoded");
+
+            var response = await httpClient.SendAsync(requestMessage);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -422,6 +431,7 @@ namespace SpotifyRunnerApp.Services
 
             return tokenData; // Return the token data for further use if needed
         }
+
 
 
         public async Task<string> GetUserIdFromToken(string accessToken)
